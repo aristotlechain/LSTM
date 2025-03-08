@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/LSTM.iml" filepath="$PROJECT_DIR$/.idea/LSTM.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/ResearchPaper.iml" filepath="$PROJECT_DIR$/.idea/ResearchPaper.iml" />
     </modules>
   </component>
 </project>

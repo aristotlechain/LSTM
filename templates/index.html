@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PHI Detection System Demo</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        body {
+            padding-top: 20px;
+            padding-bottom: 40px;
+        }
+        .highlight {
+            background-color: rgba(255, 255, 0, 0.3);
+            padding: 2px;
+            border-radius: 3px;
+        }
+        .result-area {
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 20px;
+            min-height: 100px;
+        }
+        .model-header {
+            font-weight: bold;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+            margin-bottom: 10px;
+        }
+        mark {
+            background-color: rgba(255, 99, 132, 0.3);
+            padding: 2px;
+            border-radius: 3px;
+        }
+        .card {
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .result-card {
+            height: 250px;
+            overflow-y: auto;
+        }
+        .dashboard-card {
+            height: 400px;
+        }
+        .navbar-brand {
+            font-weight: bold;
+        }
+        .nav-pills .nav-link.active {
+            background-color: #6c757d;
+        }
+        .tab-content {
+            padding-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="pb-3 mb-4 border-bottom">
+            <div class="d-flex align-items-center text-dark text-decoration-none">
+                <img src="https://img.icons8.com/color/48/000000/data-protection.png" alt="Logo" width="40" height="40" class="me-2">
+                <span class="fs-4">PHI Detection System Demo: LSTM vs CRF</span>
+            </div>
+        </header>
+
+        <!-- Introduction Card -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">Demonstration of LSTM Superiority for PHI Detection</h5>
+                <p class="card-text">
+                    This demo compares BiLSTM (Bidirectional Long Short-Term Memory) and CRF (Conditional Random Fields) models
+                    for de-identifying Protected Health Information (PHI) in clinical texts. Research has shown that
+                    deep learning approaches like LSTM outperform traditional methods like CRF for this task.
+                </p>
+                <p class="card-text">
+                    Enter any clinical text below to see how both models perform in identifying PHI elements such as
+                    names, dates, locations, and identifiers.
+                </p>
+            </div>
+        </div>
+
+        <!-- Input Form -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">Test PHI Detection</h5>
+                <div class="form-group">
+                    <label for="inputText" class="form-label">Enter clinical text:</label>
+                    <textarea class="form-control" id="inputText" rows="4" placeholder="Enter clinical text to analyze for PHI...">Patient John Smith (MRN: 12345) was admitted on 07/15/2023. Contact Dr. Johnson at 555-123-4567 for follow-up. Address: 123 Main St, New York NY.</textarea>
+                </div>
+                <button class="btn btn-primary mt-3" id="analyzeBtn">Analyze Text</button>
+                <button class="btn btn-secondary mt-3 ms-2" id="loadSampleBtn">Load Sample</button>
+            </div>
+        </div>
+
+        <!-- Results Section with Tabs -->
+        <ul class="nav nav-pills mb-3" id="results-tab" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="comparison-tab" data-bs-toggle="pill" data-bs-target="#comparison" type="button" role="tab" aria-controls="comparison" aria-selected="true">Comparison View</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="lstm-tab" data-bs-toggle="pill" data-bs-target="#lstm" type="button" role="tab" aria-controls="lstm" aria-selected="false">LSTM Details</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="crf-tab" data-bs-toggle="pill" data-bs-target="#crf" type="button" role="tab" aria-controls="crf" aria-selected="false">CRF Details</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="dashboard-tab" data-bs-toggle="pill" data-bs-target="#dashboard" type="button" role="tab" aria-controls="dashboard" aria-selected="false">Performance Dashboard</button>
+            </li>
+        </ul>
+
+        <div class="tab-content" id="results-tabContent">
+            <!-- Comparison Tab -->
+            <div class="tab-pane fade show active" id="comparison" role="tabpanel" aria-labelledby="comparison-tab">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card result-card">
+                            <div class="card-body">
+                                <h5 class="card-title">LSTM Results</h5>
+                                <div id="lstmHighlighted" class="result-area"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card result-card">
+                            <div class="card-body">
+                                <h5 class="card-title">CRF Results</h5>
+                                <div id="crfHighlighted" class="result-area"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mt-4">
+                    <div class="card-body">
+                        <h5 class="card-title">Performance Comparison</h5>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <table class="table table-bordered">
+                                    <thead>
+                                        <tr>
+                                            <th>Metric</th>
+                                            <th>LSTM</th>
+                                            <th>CRF</th>
+                                            <th>Difference</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="metricsTable">
+                                        <!-- Will be populated by JavaScript -->
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="col-md-6">
+                                <div id="comparisonChartContainer">
+                                    <img id="comparisonChart" class="img-fluid" alt="Performance Comparison Chart">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- LSTM Tab -->
+            <div class="tab-pane fade" id="lstm" role="tabpanel" aria-labelledby="lstm-tab">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">BiLSTM Model Architecture</h5>
+                        <div class="row">
+                            <div class="col-md-8">
+                                <p>The BiLSTM model used in this demo consists of:</p>
+                                <ul>
+                                    <li>An embedding layer that converts tokens to dense vector representations</li>
+                                    <li>A bidirectional LSTM layer that captures context in both directions</li>
+                                    <li>A fully connected output layer with softmax activation</li>
+                                    <li>Dropout regularization (0.3) to prevent overfitting</li>
+                                </ul>
+                                <p>
+                                    BiLSTM networks excel at capturing long-range dependencies in text, making them
+                                    particularly well-suited for identifying PHI that may depend on surrounding context.
+                                </p>
+                            </div>
+                            <div class="col-md-4">
+                                <img src="static/lstm_architecture.png" alt="LSTM Architecture" class="img-fluid">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mt-4">
+                    <div class="card-body">
+                        <h5 class="card-title">LSTM Detected PHI Elements</h5>
+                        <div id="lstmDetailedResults" class="result-area"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CRF Tab -->
+            <div class="tab-pane fade" id="crf" role="tabpanel" aria-labelledby="crf-tab">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">CRF Model Details</h5>
+                        <div class="row">
+                            <div class="col-md-8">
+                                <p>The CRF model used in this demo:</p>
+                                <ul>
+                                    <li>Uses handcrafted features such as word shape, capitalization, and context</li>
+                                    <li>Takes into account transitions between tags (O → PHI, PHI → O)</li>
+                                    <li>Employs L-BFGS algorithm for optimization</li>
+                                    <li>Traditional approach relying on feature engineering</li>
+                                </ul>
+                                <p>
+                                    CRF models have been the standard for sequence labeling tasks but require extensive
+                                    feature engineering and struggle with unseen patterns.
+                                </p>
+                            </div>
+                            <div class="col-md-4">
+                                <img src="static/crf_architecture.png" alt="CRF Architecture" class="img-fluid">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mt-4">
+                    <div class="card-body">
+                        <h5 class="card-title">CRF Detected PHI Elements</h5>
+                        <div id="crfDetailedResults" class="result-area"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dashboard Tab -->
+            <div class="tab-pane fade" id="dashboard" role="tabpanel" aria-labelledby="dashboard-tab">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card dashboard-card">
+                            <div class="card-body">
+                                <h5 class="card-title">Performance by PHI Category</h5>
+                                <canvas id="phiCategoryChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card dashboard-card">
+                            <div class="card-body">
+                                <h5 class="card-title">Training Convergence</h5>
+                                <canvas id="convergenceChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row mt-4">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-body">
+                                <h5 class="card-title">Performance Metrics</h5>
+                                <div class="table-responsive">
+                                    <table class="table table-bordered">
+                                        <thead>
+                                            <tr>
+                                                <th>Model</th>
+                                                <th>Precision</th>
+                                                <th>Recall</th>
+                                                <th>F1-Score</th>
+                                                <th>Training Time</th>
+                                                <th>Inference Time</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="performanceTable">
+                                            <!-- Will be populated by JavaScript -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-body">
+                                <h5 class="card-title">Research Findings</h5>
+                                <p>Based on the research paper "EVALUATION OF MACHINE LEARNING MODELS FOR PATIENT DATA DE-IDENTIFICATION IN CLINICAL RECORDS" by Yamani Kakarla (Dalhousie University, 2018):</p>
+                                <ul>
+                                    <li>LSTM models show significant improvement over CRF for PHI detection</li>
+                                    <li>Deep learning approaches reduce the need for manual feature engineering</li>
+                                    <li>BiLSTM models better capture contextual information in clinical text</li>
+                                    <li>The implementation used in this demo confirms these research findings</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="pt-3 mt-4 text-muted border-top">
+            <p>PHI Detection Demo &copy; 2023</p>
+        </footer>
+    </div>
+
+    <!-- JavaScript -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // DOM Elements
+            const inputText = document.getElementById('inputText');
+            const analyzeBtn = document.getElementById('analyzeBtn');
+            const loadSampleBtn = document.getElementById('loadSampleBtn');
+            const lstmHighlighted = document.getElementById('lstmHighlighted');
+            const crfHighlighted = document.getElementById('crfHighlighted');
+            const lstmDetailedResults = document.getElementById('lstmDetailedResults');
+            const crfDetailedResults = document.getElementById('crfDetailedResults');
+            const metricsTable = document.getElementById('metricsTable');
+            const comparisonChart = document.getElementById('comparisonChart');
+            const performanceTable = document.getElementById('performanceTable');
+
+            // Sample texts
+            const sampleTexts = [
+                "Patient John Smith (MRN: 12345) was admitted on 07/15/2023. Contact Dr. Johnson at 555-123-4567 for follow-up. Address: 123 Main St, New York NY.",
+                "PATIENT: Sarah Williams (DOB: 03/22/1980) was transferred from Memorial Hospital on March 15, 2023. Her SSN is 123-45-6789.",
+                "Mr. Robert Johnson can be reached at (555) 987-6543 or robert.johnson@email.com. His health insurance ID is ABC12345XYZ.",
+                "Dr. Elizabeth Chen ordered labs on 04/10/2023 for patient #678901 at Boston Medical Center, 100 Main Avenue, Boston MA 02115."
+            ];
+
+            // Load a random sample text
+            loadSampleBtn.addEventListener('click', function() {
+                const randomIndex = Math.floor(Math.random() * sampleTexts.length);
+                inputText.value = sampleTexts[randomIndex];
+            });
+
+            // Analyze text
+            analyzeBtn.addEventListener('click', function() {
+                const text = inputText.value.trim();
+                if (!text) {
+                    alert('Please enter some text to analyze.');
+                    return;
+                }
+
+                // Show loading state
+                analyzeBtn.disabled = true;
+                analyzeBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Analyzing...';
+
+                // Call API
+                fetch('/detect-phi/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ text: text })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    // Update UI with results
+                    displayResults(data);
+
+                    // Reset button
+                    analyzeBtn.disabled = false;
+                    analyzeBtn.innerHTML = 'Analyze Text';
+
+                    // Get dashboard data
+                    fetchDashboardData();
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('An error occurred while analyzing the text.');
+
+                    // Reset button
+                    analyzeBtn.disabled = false;
+                    analyzeBtn.innerHTML = 'Analyze Text';
+                });
+            });
+
+            // Display results
+            function displayResults(data) {
+                // Update highlighted text
+                lstmHighlighted.innerHTML = data.text_with_highlights.lstm_highlighted;
+                crfHighlighted.innerHTML = data.text_with_highlights.crf_highlighted;
+
+                // Update detailed results
+                let lstmDetails = '<ul>';
+                data.lstm_results.forEach(item => {
+                    lstmDetails += `<li><strong>${item.token}</strong> (position: ${item.position})</li>`;
+                });
+                lstmDetails += '</ul>';
+                lstmDetailedResults.innerHTML = lstmDetails;
+
+                let crfDetails = '<ul>';
+                data.crf_results.forEach(item => {
+                    crfDetails += `<li><strong>${item.token}</strong> (position: ${item.position})</li>`;
+                });
+                crfDetails += '</ul>';
+                crfDetailedResults.innerHTML = crfDetails;
+
+                // Update metrics table
+                metricsTable.innerHTML = '';
+                const metrics = ['precision', 'recall', 'f1-score', 'accuracy'];
+                metrics.forEach(metric => {
+                    const lstmValue = data.lstm_metrics[metric];
+                    const crfValue = data.crf_metrics[metric];
+                    const diff = (lstmValue - crfValue).toFixed(2);
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${metric.charAt(0).toUpperCase() + metric.slice(1)}</td>
+                        <td>${lstmValue.toFixed(2)}</td>
+                        <td>${crfValue.toFixed(2)}</td>
+                        <td class="${diff > 0 ? 'text-success' : 'text-danger'}">${diff > 0 ? '+' : ''}${diff}</td>
+                    `;
+                    metricsTable.appendChild(row);
+                });
+
+                // Update comparison chart
+                comparisonChart.src = `data:image/png;base64,${data.plot}`;
+            }
+
+            // Fetch dashboard data
+            function fetchDashboardData() {
+                fetch('/comparison-data/')
+                .then(response => response.json())
+                .then(data => {
+                    updateDashboard(data);
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                });
+            }
+
+            // Update dashboard
+            function updateDashboard(data) {
+                // Update performance table
+                performanceTable.innerHTML = '';
+                const models = ['lstm', 'crf'];
+                models.forEach(model => {
+                    const perf = data.performance_metrics[model];
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${model.toUpperCase()}</td>
+                        <td>${perf.precision.toFixed(2)}</td>
+                        <td>${perf.recall.toFixed(2)}</td>
+                        <td>${perf.f1_score.toFixed(2)}</td>
+                        <td>${perf.training_time}ms</td>
+                        <td>${perf.inference_time}ms</td>
+                    `;
+                    performanceTable.appendChild(row);
+                });
+
+                // PHI Category Chart
+                const phiCategoryCtx = document.getElementById('phiCategoryChart').getContext('2d');
+                const categories = Object.keys(data.phi_categories);
+                const lstmValues = categories.map(cat => data.phi_categories[cat].lstm);
+                const crfValues = categories.map(cat => data.phi_categories[cat].crf);
+
+                new Chart(phiCategoryCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: categories.map(c => c.charAt(0).toUpperCase() + c.slice(1)),
+                        datasets: [
+                            {
+                                label: 'LSTM',
+                                data: lstmValues,
+                                backgroundColor: 'rgba(54, 162, 235, 0.6)',
+                                borderColor: 'rgba(54, 162, 235, 1)',
+                                borderWidth: 1
+                            },
+                            {
+                                label: 'CRF',
+                                data: crfValues,
+                                backgroundColor: 'rgba(255, 99, 132, 0.6)',
+                                borderColor: 'rgba(255, 99, 132, 1)',
+                                borderWidth: 1
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                max: 1.0,
+                                title: {
+                                    display: true,
+                                    text: 'F1-Score'
+                                }
+                            }
+                        }
+                    }
+                });
+
+                // Convergence Chart
+                const convergenceCtx = document.getElementById('convergenceChart').getContext('2d');
+
+                new Chart(convergenceCtx, {
+                    type: 'line',
+                    data: {
+                        labels: data.training_progress.epochs,
+                        datasets: [
+                            {
+                                label: 'LSTM Loss',
+                                data: data.training_progress.lstm_loss,
+                                backgroundColor: 'rgba(54, 162, 235, 0.1)',
+                                borderColor: 'rgba(54, 162, 235, 1)',
+                                borderWidth: 2,
+                                fill: true,
+                                tension: 0.1
+                            },
+                            {
+                                label: 'CRF Loss',
+                                data: data.training_progress.crf_loss,
+                                backgroundColor: 'rgba(255, 99, 132, 0.1)',
+                                borderColor: 'rgba(255, 99, 132, 1)',
+                                borderWidth: 2,
+                                fill: true,
+                                tension: 0.1
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: 'Loss Value'
+                                }
+                            },
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: 'Epoch'
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Initial load of a sample text
+            loadSampleBtn.click();
+        });
+    </script>
+</body>
+</html>
