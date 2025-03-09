@@ -1,7 +1,7 @@
 # ================================================================
 # Software License Agreement
 # Author: Sarthak Kaushik, Arsh Zala, Mohit Patel
-# Email: skaushi1@lakeheadu.ca
+# Email: skaushi1@lakeheadu.ca, mpate213@lakeheadu.ca, azala1@lakeheadu.ca
 # Admission Number: 1270126, 1277400, 1277507
 # Institution: Lakehead University
 # Permission provided to supervisor: Dr. Jinan Fiaidhi
